@@ -1,1 +1,9 @@
-MAPS_API_KEY=api_key
+# Copy this file to local.properties and fill in your values.
+# DO NOT commit local.properties to version control.
+
+sdk.dir=/path/to/your/Android/sdk
+
+# Google Maps API key — required for the map view.
+# Get one at https://console.cloud.google.com/apis/credentials
+# Enable "Maps SDK for Android" for the key.
+MAPS_API_KEY=your_api_key_here
