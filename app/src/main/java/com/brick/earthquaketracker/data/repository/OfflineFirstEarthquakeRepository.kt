@@ -68,6 +68,8 @@ class OfflineFirstEarthquakeRepository @Inject constructor(
             .map { it?.toDomain() }
             .flowOn(ioDispatcher)
 
+    override fun observeTotalCount(): Flow<Int> = dao.observeCount()
+
     override fun observeSyncStatus(): Flow<SyncStatus> =
         combine(syncMetadataStore.lastSyncAt, _inFlight) { lastSync, inFlight ->
             SyncStatus(

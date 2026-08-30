@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 interface EarthquakeRepository {
     fun observeEarthquakes(filter: EarthquakeFilter): Flow<List<Earthquake>>
     fun observeEarthquake(id: String): Flow<Earthquake?>
+    fun observeTotalCount(): Flow<Int>
     fun observeSyncStatus(): Flow<SyncStatus>
     suspend fun refresh(): AppResult<Unit>
 }

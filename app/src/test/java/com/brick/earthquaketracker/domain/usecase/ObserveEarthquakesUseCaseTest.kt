@@ -28,6 +28,7 @@ class ObserveEarthquakesUseCaseTest {
         override fun observeEarthquakes(filter: EarthquakeFilter) = earthquakeFlow
         override fun observeEarthquake(id: String): Flow<Earthquake?> =
             MutableStateFlow(null)
+        override fun observeTotalCount(): Flow<Int> = MutableStateFlow(0)
         override fun observeSyncStatus(): Flow<SyncStatus> =
             MutableStateFlow(SyncStatus(lastSyncAt = null, inFlight = false))
         override suspend fun refresh(): AppResult<Unit> = AppResult.Success(Unit)

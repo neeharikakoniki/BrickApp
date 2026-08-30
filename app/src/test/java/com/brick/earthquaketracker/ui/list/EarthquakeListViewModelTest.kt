@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -46,6 +47,9 @@ class EarthquakeListViewModelTest {
 
         override fun observeEarthquake(id: String): Flow<Earthquake?> =
             MutableStateFlow(null)
+
+        override fun observeTotalCount(): Flow<Int> =
+            earthquakesFlow.map { it.size }
 
         override fun observeSyncStatus(): Flow<SyncStatus> = syncStatusFlow
 

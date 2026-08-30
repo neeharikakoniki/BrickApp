@@ -8,6 +8,7 @@ import java.time.Instant
 
 data class ListUiState(
     val earthquakes: List<EarthquakeListing> = emptyList(),
+    val totalCount: Int = 0,
     val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val emptyReason: EmptyReason? = null,
@@ -16,7 +17,9 @@ data class ListUiState(
     val locationState: LocationState = LocationState.PermissionNotRequested,
     val filter: EarthquakeFilter = EarthquakeFilter.Default,
     val sortOrder: SortOrder = SortOrder.MOST_RECENT,
-)
+) {
+    val isFiltered: Boolean get() = filter != EarthquakeFilter.Default
+}
 
 enum class EmptyReason {
     NO_DATA,

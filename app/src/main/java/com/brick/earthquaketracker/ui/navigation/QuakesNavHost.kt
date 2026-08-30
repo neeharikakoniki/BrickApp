@@ -49,6 +49,9 @@ fun QuakesNavHost(
                 onFilterChange = listViewModel::updateFilter,
                 onSortChange = listViewModel::updateSortOrder,
                 onClearError = listViewModel::clearError,
+                onRequestLocationPermission = {
+                    permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                },
             )
         }
 

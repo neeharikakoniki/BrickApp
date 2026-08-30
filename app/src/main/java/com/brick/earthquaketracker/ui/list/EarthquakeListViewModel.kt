@@ -50,10 +50,10 @@ class EarthquakeListViewModel @Inject constructor(
     val uiState: StateFlow<ListUiState> = combine(
         filterSort.flatMapLatest { (filter, sort) -> observeEarthquakes(filter, sort) },
         earthquakeRepository.observeSyncStatus(),
-        locationRepository.observeLocationState(),
+        combine(locationRepository.observeLocationState(), earthquakeRepository.observeTotalCount()) { loc, count -> loc to count },
         filterSort,
         _errorMessage,
-    ) { earthquakes, syncStatus, locationState, (filter, sortOrder), errorMsg ->
+    ) { earthquakes, syncStatus, (locationState, totalCount), (filter, sortOrder), errorMsg ->
         val isInitialLoading = syncStatus.lastSyncAt == null && syncStatus.inFlight
         val emptyReason = when {
             earthquakes.isNotEmpty() -> null
@@ -68,6 +68,7 @@ class EarthquakeListViewModel @Inject constructor(
 
         ListUiState(
             earthquakes = earthquakes,
+            totalCount = totalCount,
             isInitialLoading = isInitialLoading,
             isRefreshing = syncStatus.inFlight && !isInitialLoading,
             emptyReason = emptyReason,

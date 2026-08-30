@@ -33,6 +33,9 @@ abstract class EarthquakeDao {
     @Query("SELECT COUNT(*) FROM earthquakes")
     abstract suspend fun count(): Int
 
+    @Query("SELECT COUNT(*) FROM earthquakes")
+    abstract fun observeCount(): Flow<Int>
+
     /**
      * Atomic sync: upsert incoming events (skipping any whose `updatedAtMillis`
      * is older than what is already stored), then prune events older than the

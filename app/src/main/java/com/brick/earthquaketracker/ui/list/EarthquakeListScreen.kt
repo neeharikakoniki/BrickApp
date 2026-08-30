@@ -11,10 +11,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -29,7 +32,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -37,6 +42,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.brick.earthquaketracker.domain.model.EarthquakeFilter
 import com.brick.earthquaketracker.domain.model.EarthquakeListing
+import com.brick.earthquaketracker.domain.model.LocationState
 import com.brick.earthquaketracker.domain.model.SortOrder
 import com.brick.earthquaketracker.ui.components.EmptyState
 import com.brick.earthquaketracker.ui.components.MagnitudeBadge
@@ -55,8 +62,8 @@ import java.time.format.DateTimeFormatter
 
 private val MAGNITUDE_THRESHOLDS = listOf(
     null to "All",
-    3.0 to "M3+",
-    4.5 to "M4.5+",
+    4.0 to "M4+",
+    5.0 to "M5+",
     6.0 to "M6+",
 )
 
@@ -69,6 +76,7 @@ fun EarthquakeListScreen(
     onFilterChange: (EarthquakeFilter) -> Unit,
     onSortChange: (SortOrder) -> Unit,
     onClearError: () -> Unit,
+    onRequestLocationPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -121,6 +129,23 @@ fun EarthquakeListScreen(
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            if (state.locationState is LocationState.PermissionNotRequested) {
+                                item(key = "location_prompt") {
+                                    LocationPromptRow(
+                                        onEnable = onRequestLocationPermission,
+                                    )
+                                }
+                            }
+
+                            if (state.isFiltered) {
+                                item(key = "result_count") {
+                                    ResultCountRow(
+                                        showing = state.earthquakes.size,
+                                        total = state.totalCount,
+                                    )
+                                }
+                            }
+
                             items(
                                 items = state.earthquakes,
                                 key = { it.earthquake.id },
@@ -137,6 +162,52 @@ fun EarthquakeListScreen(
             }
         }
     }
+}
+
+@Composable
+private fun LocationPromptRow(onEnable: () -> Unit) {
+    var dismissed by rememberSaveable { mutableStateOf(false) }
+    if (dismissed) return
+
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.LocationOn,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = "See how far these are from you",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onEnable) {
+                Text("Enable")
+            }
+            TextButton(onClick = { dismissed = true }) {
+                Text("Dismiss")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResultCountRow(showing: Int, total: Int) {
+    Text(
+        text = "Showing $showing of $total events",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
 }
 
 @Composable
@@ -193,7 +264,7 @@ private fun ListTopBar(
 
     Column {
         TopAppBar(
-            title = { Text("Earthquakes") },
+            title = { Text("Quakes") },
             actions = {
                 IconButton(onClick = { showSortMenu = true }) {
                     Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
