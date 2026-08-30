@@ -1,0 +1,82 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "generated": 1700000000000,
+    "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson",
+    "title": "USGS Magnitude 2.5+ Earthquakes, Past Week",
+    "status": 200,
+    "api": "1.10.3",
+    "count": 3
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 5.2,
+        "place": "28 km SSE of Mie, Japan",
+        "time": 1700000000000,
+        "updated": 1700000100000,
+        "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000abcd",
+        "detail": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/detail/us7000abcd.geojson",
+        "status": "reviewed",
+        "tsunami": 0,
+        "sig": 416,
+        "type": "earthquake",
+        "title": "M 5.2 - 28 km SSE of Mie, Japan",
+        "alert": "green",
+        "magType": "mww"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [136.8, 34.2, 35.0]
+      },
+      "id": "us7000abcd"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": null,
+        "place": null,
+        "time": 1700001000000,
+        "updated": 1700001100000,
+        "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000efgh",
+        "detail": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/detail/us7000efgh.geojson",
+        "status": "automatic",
+        "tsunami": 0,
+        "sig": 50,
+        "type": "earthquake",
+        "title": "M ? - Unknown Region",
+        "alert": null,
+        "magType": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-120.5, 37.8, -1.2]
+      },
+      "id": "us7000efgh"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 3.1,
+        "place": "10 km NW of The Geysers, CA",
+        "time": 1700002000000,
+        "updated": 1700002100000,
+        "url": "https://earthquake.usgs.gov/earthquakes/eventpage/nc73940701",
+        "detail": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/detail/nc73940701.geojson",
+        "status": "reviewed",
+        "tsunami": 1,
+        "sig": 200,
+        "type": "earthquake",
+        "title": "M 3.1 - 10 km NW of The Geysers, CA",
+        "alert": "yellow",
+        "magType": "ml"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.8, 38.8, 2.5]
+      },
+      "id": "nc73940701"
+    }
+  ]
+}

@@ -14,13 +14,13 @@ val localProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.example.brickapp"
+    namespace = "com.brick.earthquaketracker"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.brickapp"
+        applicationId = "com.brick.earthquaketracker"
         minSdk = 26
         targetSdk = 37
         versionCode = 1
@@ -92,6 +92,7 @@ dependencies {
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // DataStore
     implementation(libs.datastore.preferences)
