@@ -204,9 +204,9 @@ class EarthquakeListViewModelTest {
         assertThat(fakeLocationRepo.lastPermissionResult).isTrue()
     }
 
-    private fun testQuake(id: String) = Earthquake(
+    private fun testQuake(id: String, magnitude: Double? = 4.5) = Earthquake(
         id = id,
-        magnitude = 4.5,
+        magnitude = magnitude,
         magnitudeType = "ml",
         place = "Test Place",
         occurredAt = Instant.parse("2024-01-14T12:00:00Z"),

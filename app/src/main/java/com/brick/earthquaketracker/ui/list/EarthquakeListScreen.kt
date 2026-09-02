@@ -1,10 +1,17 @@
 package com.brick.earthquaketracker.ui.list
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +22,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.outlined.LocationOff
@@ -29,7 +38,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -47,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.brick.earthquaketracker.domain.model.EarthquakeFilter
@@ -56,10 +65,12 @@ import com.brick.earthquaketracker.domain.model.SortOrder
 import com.brick.earthquaketracker.ui.components.EmptyState
 import com.brick.earthquaketracker.ui.components.MagnitudeBadge
 import com.brick.earthquaketracker.ui.components.StaleDataBanner
+import java.text.NumberFormat
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private val MAGNITUDE_THRESHOLDS = listOf(
     null to "All",
@@ -110,9 +121,7 @@ fun EarthquakeListScreen(
 
             when {
                 state.isInitialLoading -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+                    ShimmerList()
                 }
                 state.emptyReason != null -> {
                     EmptyState(
@@ -131,8 +140,10 @@ fun EarthquakeListScreen(
                         onRefresh = onRefresh,
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            // Location banner — distinct per state
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = 8.dp),
+                        ) {
                             item(key = "location_banner") {
                                 LocationBanner(
                                     locationState = state.locationState,
@@ -143,13 +154,12 @@ fun EarthquakeListScreen(
                                 )
                             }
 
-                            if (state.isFiltered) {
-                                item(key = "result_count") {
-                                    ResultCountRow(
-                                        showing = state.earthquakes.size,
-                                        total = state.totalCount,
-                                    )
-                                }
+                            item(key = "summary_header") {
+                                SummaryHeader(
+                                    count = state.earthquakes.size,
+                                    totalCount = state.totalCount,
+                                    isFiltered = state.isFiltered,
+                                )
                             }
 
                             items(
@@ -170,16 +180,35 @@ fun EarthquakeListScreen(
     }
 }
 
-/**
- * Shows different content based on [LocationState]:
- * - [PermissionNotRequested] → "See how far these are from you" prompt (dismissible)
- * - [PermissionDenied] → quieter row explaining distances need location (dismissible)
- * - [PermanentlyDenied] → same but action opens app settings (dismissible)
- * - [Unavailable] → subtle "Locating…" indicator
- * - [Available] → compact "Showing distances from your location" info line
- *
- * Dismissed state is persisted in DataStore and suppresses NotRequested/Denied banners.
- */
+// ---------------------------------------------------------------------------
+// Summary header
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun SummaryHeader(
+    count: Int,
+    totalCount: Int,
+    isFiltered: Boolean,
+) {
+    val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.getDefault()) }
+    val label = if (isFiltered) {
+        "${numberFormat.format(count)} of ${numberFormat.format(totalCount)} events"
+    } else {
+        "${numberFormat.format(count)} events"
+    }
+
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Location banner — distinct per state
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun LocationBanner(
     locationState: LocationState,
@@ -316,57 +345,131 @@ private fun LocationPromptRow(
     }
 }
 
-@Composable
-private fun ResultCountRow(showing: Int, total: Int) {
-    Text(
-        text = "Showing $showing of $total events",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-    )
-}
+// ---------------------------------------------------------------------------
+// Earthquake row
+// ---------------------------------------------------------------------------
 
 @Composable
 private fun EarthquakeRow(listing: EarthquakeListing, onClick: () -> Unit) {
     val quake = listing.earthquake
+    val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.getDefault()) }
 
-    ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
-        leadingContent = { MagnitudeBadge(quake.magnitude) },
-        headlineContent = {
-            Text(
-                text = quake.place,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        supportingContent = {
-            Row {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MagnitudeBadge(quake.magnitude)
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = formatRelativeTime(quake.occurredAt),
+                    text = quake.place,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = buildSupportingText(quake.occurredAt, quake.depthKm),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                listing.distanceKm?.let { km ->
-                    Text(
-                        text = " · %.0f km %s".format(km, listing.bearing?.label ?: ""),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
-        },
-        trailingContent = {
             if (quake.tsunamiWarning) {
+                Spacer(Modifier.width(8.dp))
                 Icon(
                     imageVector = Icons.Outlined.Warning,
                     contentDescription = "Tsunami warning",
                     tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp),
                 )
             }
-        },
-    )
+        }
+
+        listing.distanceKm?.let { km ->
+            val bearingLabel = listing.bearing?.label?.let { " $it" } ?: ""
+            Text(
+                text = "${numberFormat.format(km.toLong())} km$bearingLabel",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 52.dp, top = 4.dp),
+            )
+        }
+    }
 }
+
+private fun buildSupportingText(occurredAt: Instant, depthKm: Double): String {
+    val relativeTime = formatRelativeTime(occurredAt)
+    val depthText = when {
+        depthKm < 0 -> "${"%.1f".format(-depthKm)} km above sea level"
+        else -> "${depthKm.toLong()} km deep"
+    }
+    return "$relativeTime · $depthText"
+}
+
+// ---------------------------------------------------------------------------
+// Shimmer skeleton
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ShimmerList() {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by transition.animateFloat(
+        initialValue = 0.12f,
+        targetValue = 0.04f,
+        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+        label = "shimmerAlpha",
+    )
+    val shimmerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+
+    Column(modifier = Modifier.padding(top = 8.dp)) {
+        repeat(8) {
+            ShimmerRow(shimmerColor)
+            if (it < 7) HorizontalDivider()
+        }
+    }
+}
+
+@Composable
+private fun ShimmerRow(color: androidx.compose.ui.graphics.Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(color),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(14.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(color),
+            )
+            Spacer(Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.45f)
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(color),
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Top bar
+// ---------------------------------------------------------------------------
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

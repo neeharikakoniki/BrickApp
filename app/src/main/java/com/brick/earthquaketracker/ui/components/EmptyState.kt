@@ -5,15 +5,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material.icons.outlined.Landscape
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,7 +30,9 @@ fun EmptyState(
     onRetry: (() -> Unit)? = null,
 ) {
     Column(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -41,13 +44,13 @@ fun EmptyState(
             )
             EmptyReason.NO_RESULTS_FOR_FILTER -> Triple(
                 Icons.Outlined.FilterAlt,
-                "No results",
-                "Try adjusting your filter or sort settings.",
+                "No matching events",
+                "Nothing matches the current filter.",
             )
             EmptyReason.NO_CACHE_OFFLINE -> Triple(
                 Icons.Outlined.CloudOff,
-                "You're offline",
-                "Connect to the internet and pull to refresh.",
+                "Unable to load earthquakes",
+                "Check your internet connection and try again.",
             )
         }
 
@@ -72,16 +75,16 @@ fun EmptyState(
         )
 
         if (reason == EmptyReason.NO_RESULTS_FOR_FILTER && onClearFilter != null) {
-            Spacer(Modifier.height(16.dp))
-            TextButton(onClick = onClearFilter) {
-                Text("Clear filter")
+            Spacer(Modifier.height(24.dp))
+            FilledTonalButton(onClick = onClearFilter) {
+                Text("Clear filters")
             }
         }
 
         if (reason == EmptyReason.NO_CACHE_OFFLINE && onRetry != null) {
-            Spacer(Modifier.height(16.dp))
-            TextButton(onClick = onRetry) {
-                Text("Retry")
+            Spacer(Modifier.height(24.dp))
+            FilledTonalButton(onClick = onRetry) {
+                Text("Try again")
             }
         }
     }
