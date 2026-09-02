@@ -24,9 +24,9 @@ import com.brick.earthquaketracker.ui.list.EmptyReason
 @Composable
 fun EmptyState(
     reason: EmptyReason,
+    modifier: Modifier = Modifier,
     onClearFilter: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.fillMaxSize(),

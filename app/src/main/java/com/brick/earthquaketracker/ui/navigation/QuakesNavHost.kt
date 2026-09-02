@@ -1,6 +1,8 @@
 package com.brick.earthquaketracker.ui.navigation
 
 import android.Manifest
+import android.content.Intent
+import androidx.core.net.toUri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -18,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -26,6 +29,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.toRoute
 import com.brick.earthquaketracker.ui.detail.EarthquakeDetailScreen
 import com.brick.earthquaketracker.ui.detail.EarthquakeDetailViewModel
 import com.brick.earthquaketracker.ui.list.EarthquakeListScreen
@@ -41,7 +45,7 @@ private data class BottomNavItem(
 
 private val bottomNavItems = listOf(
     BottomNavItem("List", Icons.AutoMirrored.Filled.List, Route.List),
-    BottomNavItem("Map", Icons.Default.Map, Route.Map),
+    BottomNavItem("Map", Icons.Default.Map, Route.Map()),
 )
 
 @Composable
@@ -50,6 +54,8 @@ fun QuakesNavHost(
     listViewModel: EarthquakeListViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -115,7 +121,8 @@ fun QuakesNavHost(
                 )
             }
 
-            composable<Route.Map> {
+            composable<Route.Map> { backStackEntry ->
+                val route = backStackEntry.toRoute<Route.Map>()
                 val viewModel = hiltViewModel<EarthquakeMapViewModel>()
                 val state by viewModel.uiState.collectAsStateWithLifecycle()
                 EarthquakeMapScreen(
@@ -123,6 +130,7 @@ fun QuakesNavHost(
                     onMarkerClick = { eventId -> navController.navigate(Route.Detail(eventId)) },
                     onRefresh = viewModel::refresh,
                     onFilterChange = viewModel::updateFilter,
+                    focusEventId = route.focusEventId,
                     bottomBarHeight = 0,
                 )
             }
@@ -133,6 +141,24 @@ fun QuakesNavHost(
                 EarthquakeDetailScreen(
                     state = state,
                     onBack = { navController.popBackStack() },
+                    onViewOnMap = { eventId ->
+                        navController.navigate(Route.Map(focusEventId = eventId)) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                        }
+                    },
+                    onOpenUsgs = { url ->
+                        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                    },
+                    onShare = { text ->
+                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                            putExtra(Intent.EXTRA_TEXT, text)
+                            type = "text/plain"
+                        }
+                        context.startActivity(Intent.createChooser(sendIntent, null))
+                    },
                 )
             }
         }

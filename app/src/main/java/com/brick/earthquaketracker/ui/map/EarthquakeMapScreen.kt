@@ -34,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,6 +79,7 @@ fun EarthquakeMapScreen(
     onMarkerClick: (String) -> Unit,
     onRefresh: () -> Unit,
     onFilterChange: (EarthquakeFilter) -> Unit,
+    focusEventId: String?,
     bottomBarHeight: Int,
     modifier: Modifier = Modifier,
 ) {
@@ -108,6 +110,25 @@ fun EarthquakeMapScreen(
                         userLocation = (state.locationState as? LocationState.Available)?.location,
                         quakes = state.earthquakes.map { it.earthquake },
                     )
+                }
+
+                // Animate to focused event when arriving from detail screen
+                LaunchedEffect(focusEventId) {
+                    if (focusEventId != null) {
+                        val target = state.earthquakes.firstOrNull {
+                            it.earthquake.id == focusEventId
+                        }
+                        target?.let {
+                            val pos = LatLng(
+                                it.earthquake.coordinates.latitude,
+                                it.earthquake.coordinates.longitude,
+                            )
+                            cameraPositionState.animate(
+                                CameraUpdateFactory.newLatLngZoom(pos, 8f),
+                            )
+                            selectedListing = it
+                        }
+                    }
                 }
 
                 val clusterItems = remember(state.earthquakes) {
