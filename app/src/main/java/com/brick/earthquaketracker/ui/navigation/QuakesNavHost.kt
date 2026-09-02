@@ -3,6 +3,7 @@ package com.brick.earthquaketracker.ui.navigation
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -95,7 +96,9 @@ fun QuakesNavHost(
         NavHost(
             navController = navController,
             startDestination = Route.List,
-            modifier = Modifier.padding(innerPadding),
+            modifier = Modifier
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding),
         ) {
             composable<Route.List> {
                 val state by listViewModel.uiState.collectAsStateWithLifecycle()
@@ -118,6 +121,9 @@ fun QuakesNavHost(
                 EarthquakeMapScreen(
                     state = state,
                     onMarkerClick = { eventId -> navController.navigate(Route.Detail(eventId)) },
+                    onRefresh = viewModel::refresh,
+                    onFilterChange = viewModel::updateFilter,
+                    bottomBarHeight = 0,
                 )
             }
 

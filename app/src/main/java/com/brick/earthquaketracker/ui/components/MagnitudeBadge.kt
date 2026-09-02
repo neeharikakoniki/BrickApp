@@ -37,7 +37,7 @@ fun MagnitudeBadge(magnitude: Double?, modifier: Modifier = Modifier) {
     }
 }
 
-private fun magnitudeColor(magnitude: Double?): Color = when {
+fun magnitudeColor(magnitude: Double?): Color = when {
     magnitude == null -> Color(0xFF9E9E9E)
     magnitude >= 7.0 -> Color(0xFFD32F2F)
     magnitude >= 5.0 -> Color(0xFFF57C00)
