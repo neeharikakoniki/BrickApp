@@ -15,6 +15,7 @@ data class ListUiState(
     val errorMessage: String? = null,
     val staleSince: Instant? = null,
     val locationState: LocationState = LocationState.PermissionNotRequested,
+    val locationPromptDismissed: Boolean = false,
     val filter: EarthquakeFilter = EarthquakeFilter.Default,
     val sortOrder: SortOrder = SortOrder.MOST_RECENT,
 ) {

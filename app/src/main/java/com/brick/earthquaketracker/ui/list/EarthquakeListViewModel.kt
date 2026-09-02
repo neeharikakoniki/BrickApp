@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brick.earthquaketracker.core.common.AppResult
 import com.brick.earthquaketracker.core.common.DataError
+import com.brick.earthquaketracker.data.local.SyncMetadataStore
 import com.brick.earthquaketracker.domain.model.EarthquakeFilter
 import com.brick.earthquaketracker.domain.model.LocationState
 import com.brick.earthquaketracker.domain.model.SortOrder
@@ -35,6 +36,7 @@ class EarthquakeListViewModel @Inject constructor(
     private val earthquakeRepository: EarthquakeRepository,
     private val locationRepository: LocationRepository,
     private val filterStateHolder: FilterStateHolder,
+    private val syncMetadataStore: SyncMetadataStore,
     private val clock: java.time.Clock,
 ) : ViewModel() {
 
@@ -50,10 +52,14 @@ class EarthquakeListViewModel @Inject constructor(
     val uiState: StateFlow<ListUiState> = combine(
         filterSort.flatMapLatest { (filter, sort) -> observeEarthquakes(filter, sort) },
         earthquakeRepository.observeSyncStatus(),
-        combine(locationRepository.observeLocationState(), earthquakeRepository.observeTotalCount()) { loc, count -> loc to count },
+        combine(
+            locationRepository.observeLocationState(),
+            earthquakeRepository.observeTotalCount(),
+            syncMetadataStore.locationPromptDismissed,
+        ) { loc, count, dismissed -> Triple(loc, count, dismissed) },
         filterSort,
         _errorMessage,
-    ) { earthquakes, syncStatus, (locationState, totalCount), (filter, sortOrder), errorMsg ->
+    ) { earthquakes, syncStatus, (locationState, totalCount, promptDismissed), (filter, sortOrder), errorMsg ->
         val isInitialLoading = syncStatus.lastSyncAt == null && syncStatus.inFlight
         val emptyReason = when {
             earthquakes.isNotEmpty() -> null
@@ -75,6 +81,7 @@ class EarthquakeListViewModel @Inject constructor(
             errorMessage = errorMsg,
             staleSince = staleSince,
             locationState = locationState,
+            locationPromptDismissed = promptDismissed,
             filter = filter,
             sortOrder = sortOrder,
         )
@@ -115,10 +122,16 @@ class EarthquakeListViewModel @Inject constructor(
         filterStateHolder.updateSortOrder(sortOrder)
     }
 
-    fun onPermissionResult(granted: Boolean) {
-        locationRepository.onPermissionResult(granted)
+    fun onPermissionResult(granted: Boolean, permanentlyDenied: Boolean = false) {
+        locationRepository.onPermissionResult(granted, permanentlyDenied)
         if (granted) {
             viewModelScope.launch { locationRepository.refreshLocation() }
+        }
+    }
+
+    fun dismissLocationPrompt() {
+        viewModelScope.launch {
+            syncMetadataStore.setLocationPromptDismissed(true)
         }
     }
 

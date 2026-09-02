@@ -17,7 +17,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.outlined.LocationOff
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -42,7 +44,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +78,8 @@ fun EarthquakeListScreen(
     onSortChange: (SortOrder) -> Unit,
     onClearError: () -> Unit,
     onRequestLocationPermission: () -> Unit,
+    onDismissLocationPrompt: () -> Unit,
+    onOpenAppSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -129,12 +132,15 @@ fun EarthquakeListScreen(
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            if (state.locationState is LocationState.PermissionNotRequested) {
-                                item(key = "location_prompt") {
-                                    LocationPromptRow(
-                                        onEnable = onRequestLocationPermission,
-                                    )
-                                }
+                            // Location banner — distinct per state
+                            item(key = "location_banner") {
+                                LocationBanner(
+                                    locationState = state.locationState,
+                                    dismissed = state.locationPromptDismissed,
+                                    onEnable = onRequestLocationPermission,
+                                    onDismiss = onDismissLocationPrompt,
+                                    onOpenSettings = onOpenAppSettings,
+                                )
                             }
 
                             if (state.isFiltered) {
@@ -164,13 +170,123 @@ fun EarthquakeListScreen(
     }
 }
 
+/**
+ * Shows different content based on [LocationState]:
+ * - [PermissionNotRequested] → "See how far these are from you" prompt (dismissible)
+ * - [PermissionDenied] → quieter row explaining distances need location (dismissible)
+ * - [PermanentlyDenied] → same but action opens app settings (dismissible)
+ * - [Unavailable] → subtle "Locating…" indicator
+ * - [Available] → compact "Showing distances from your location" info line
+ *
+ * Dismissed state is persisted in DataStore and suppresses NotRequested/Denied banners.
+ */
 @Composable
-private fun LocationPromptRow(onEnable: () -> Unit) {
-    var dismissed by rememberSaveable { mutableStateOf(false) }
-    if (dismissed) return
+private fun LocationBanner(
+    locationState: LocationState,
+    dismissed: Boolean,
+    onEnable: () -> Unit,
+    onDismiss: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    when (locationState) {
+        LocationState.PermissionNotRequested -> {
+            if (!dismissed) {
+                LocationPromptRow(
+                    icon = Icons.Outlined.LocationOn,
+                    text = "See how far these are from you",
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    actionLabel = "Enable",
+                    onAction = onEnable,
+                    onDismiss = onDismiss,
+                )
+            }
+        }
 
+        LocationState.PermissionDenied -> {
+            if (!dismissed) {
+                LocationPromptRow(
+                    icon = Icons.Outlined.LocationOff,
+                    text = "Distances need location access",
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    actionLabel = "Try again",
+                    onAction = onEnable,
+                    onDismiss = onDismiss,
+                )
+            }
+        }
+
+        LocationState.PermanentlyDenied -> {
+            if (!dismissed) {
+                LocationPromptRow(
+                    icon = Icons.Outlined.Settings,
+                    text = "Location denied — enable in Settings to see distances",
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    actionLabel = "Settings",
+                    onAction = onOpenSettings,
+                    onDismiss = onDismiss,
+                )
+            }
+        }
+
+        LocationState.Unavailable -> {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = "Locating…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        is LocationState.Available -> {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.LocationOn,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "Showing distances from your location",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationPromptRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    containerColor: androidx.compose.ui.graphics.Color,
+    contentColor: androidx.compose.ui.graphics.Color,
+    actionLabel: String,
+    onAction: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     Surface(
-        color = MaterialTheme.colorScheme.primaryContainer,
+        color = containerColor,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -178,22 +294,22 @@ private fun LocationPromptRow(onEnable: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = Icons.Outlined.LocationOn,
+                imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                tint = contentColor,
             )
             Spacer(Modifier.width(12.dp))
             Text(
-                text = "See how far these are from you",
+                text = text,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = contentColor,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onEnable) {
-                Text("Enable")
+            TextButton(onClick = onAction) {
+                Text(actionLabel)
             }
-            TextButton(onClick = { dismissed = true }) {
+            TextButton(onClick = onDismiss) {
                 Text("Dismiss")
             }
         }

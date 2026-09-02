@@ -35,6 +35,14 @@ class DefaultLocationRepositoryTest {
     }
 
     @Test
+    fun `onPermissionResult permanently denied transitions to PermanentlyDenied`() = runTest {
+        repository.onPermissionResult(granted = false, permanentlyDenied = true)
+
+        assertThat(repository.observeLocationState().first())
+            .isEqualTo(LocationState.PermanentlyDenied)
+    }
+
+    @Test
     fun `onPermissionResult granted transitions to Unavailable`() = runTest {
         repository.onPermissionResult(granted = true)
 
@@ -95,5 +103,19 @@ class DefaultLocationRepositoryTest {
 
         assertThat(repository.observeLocationState().first())
             .isEqualTo(LocationState.PermissionDenied)
+    }
+
+    @Test
+    fun `refreshLocation with permanently denied permission does nothing`() = runTest {
+        fakeLocation = UserLocation(
+            coordinates = Coordinates(40.71, -74.01),
+            capturedAt = Instant.parse("2024-01-15T12:00:00Z"),
+        )
+
+        repository.onPermissionResult(granted = false, permanentlyDenied = true)
+        repository.refreshLocation()
+
+        assertThat(repository.observeLocationState().first())
+            .isEqualTo(LocationState.PermanentlyDenied)
     }
 }

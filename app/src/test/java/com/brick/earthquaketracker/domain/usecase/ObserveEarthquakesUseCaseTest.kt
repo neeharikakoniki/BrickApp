@@ -37,7 +37,7 @@ class ObserveEarthquakesUseCaseTest {
     private val fakeLocationRepo = object : LocationRepository {
         override fun observeLocationState(): Flow<LocationState> = locationFlow
         override suspend fun refreshLocation() {}
-        override fun onPermissionResult(granted: Boolean) {}
+        override fun onPermissionResult(granted: Boolean, permanentlyDenied: Boolean) {}
     }
 
     private val useCase = ObserveEarthquakesUseCase(fakeEarthquakeRepo, fakeLocationRepo)

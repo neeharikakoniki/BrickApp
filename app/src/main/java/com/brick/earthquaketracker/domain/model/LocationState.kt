@@ -1,16 +1,15 @@
 package com.brick.earthquaketracker.domain.model
 
-/**
- * Four distinct states for location availability. Using a sealed interface rather than
- * a nullable [UserLocation] lets the UI distinguish "not asked yet" from "denied" from
- * "granted but no GPS fix" — each gets different copy and affordances.
- */
+
 sealed interface LocationState {
     /** Permission has not been requested yet. */
     data object PermissionNotRequested : LocationState
 
-    /** User denied location permission. */
+    /** User denied location permission but can be asked again. */
     data object PermissionDenied : LocationState
+
+    /** User permanently denied location permission ("Don't ask again"). */
+    data object PermanentlyDenied : LocationState
 
     /** Permission granted, but the device has no location fix (e.g. cold GPS). */
     data object Unavailable : LocationState

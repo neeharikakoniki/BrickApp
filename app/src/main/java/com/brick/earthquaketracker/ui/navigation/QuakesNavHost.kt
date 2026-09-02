@@ -2,7 +2,8 @@ package com.brick.earthquaketracker.ui.navigation
 
 import android.Manifest
 import android.content.Intent
-import androidx.core.net.toUri
+import android.provider.Settings
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -21,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -59,7 +61,20 @@ fun QuakesNavHost(
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        listViewModel.onPermissionResult(granted)
+        if (granted) {
+            listViewModel.onPermissionResult(granted = true)
+        } else {
+            // Detect permanent denial: shouldShowRequestPermissionRationale returns false
+            // when the user selected "Don't ask again" or denied twice on Android 11+.
+            val activity = context as? ComponentActivity
+            val canAskAgain = activity?.shouldShowRequestPermissionRationale(
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            ) ?: true
+            listViewModel.onPermissionResult(
+                granted = false,
+                permanentlyDenied = !canAskAgain,
+            )
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -117,6 +132,13 @@ fun QuakesNavHost(
                     onClearError = listViewModel::clearError,
                     onRequestLocationPermission = {
                         permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                    },
+                    onDismissLocationPrompt = listViewModel::dismissLocationPrompt,
+                    onOpenAppSettings = {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = "package:${context.packageName}".toUri()
+                        }
+                        context.startActivity(intent)
                     },
                 )
             }

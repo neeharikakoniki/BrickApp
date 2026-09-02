@@ -23,21 +23,18 @@ class DefaultLocationRepository @Inject constructor(
 
     override fun observeLocationState(): Flow<LocationState> = _state.asStateFlow()
 
-    override fun onPermissionResult(granted: Boolean) {
-        _state.value = if (granted) {
-            // Mark as Unavailable until refreshLocation() obtains a fix.
-            // This avoids a gap where the state is still PermissionDenied
-            // after the user just granted permission.
-            LocationState.Unavailable
-        } else {
-            LocationState.PermissionDenied
+    override fun onPermissionResult(granted: Boolean, permanentlyDenied: Boolean) {
+        _state.value = when {
+            granted -> LocationState.Unavailable
+            permanentlyDenied -> LocationState.PermanentlyDenied
+            else -> LocationState.PermissionDenied
         }
     }
 
     override suspend fun refreshLocation() {
-        // Only attempt a fix if permission was granted (state is Unavailable or Available).
         if (_state.value is LocationState.PermissionNotRequested ||
-            _state.value is LocationState.PermissionDenied
+            _state.value is LocationState.PermissionDenied ||
+            _state.value is LocationState.PermanentlyDenied
         ) return
 
         val location = locationDataSource.currentLocation()

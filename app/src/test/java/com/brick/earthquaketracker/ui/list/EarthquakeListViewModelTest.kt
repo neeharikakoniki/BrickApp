@@ -1,8 +1,12 @@
 package com.brick.earthquaketracker.ui.list
 
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import app.cash.turbine.test
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import com.brick.earthquaketracker.core.common.AppResult
 import com.brick.earthquaketracker.core.common.DataError
+import com.brick.earthquaketracker.data.local.SyncMetadataStore
 import com.brick.earthquaketracker.domain.model.Coordinates
 import com.brick.earthquaketracker.domain.model.Earthquake
 import com.brick.earthquaketracker.domain.model.EarthquakeFilter
@@ -25,7 +29,9 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -33,6 +39,8 @@ import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EarthquakeListViewModelTest {
+
+    @get:Rule val tempFolder = TemporaryFolder()
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private val earthquakesFlow = MutableStateFlow<List<Earthquake>>(emptyList())
@@ -60,7 +68,7 @@ class EarthquakeListViewModelTest {
         var lastPermissionResult: Boolean? = null
         override fun observeLocationState(): Flow<LocationState> = locationFlow
         override suspend fun refreshLocation() {}
-        override fun onPermissionResult(granted: Boolean) {
+        override fun onPermissionResult(granted: Boolean, permanentlyDenied: Boolean) {
             lastPermissionResult = granted
         }
     }
@@ -75,12 +83,23 @@ class EarthquakeListViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel() = EarthquakeListViewModel(
+    private fun createSyncMetadataStore() = SyncMetadataStore(
+        PreferenceDataStoreFactory.create(
+            scope = CoroutineScope(testDispatcher + SupervisorJob()),
+        ) {
+            tempFolder.newFile("test_vm.preferences_pb")
+        },
+    )
+
+    private fun createViewModel(
+        syncMetadataStore: SyncMetadataStore = createSyncMetadataStore(),
+    ) = EarthquakeListViewModel(
         observeEarthquakes = ObserveEarthquakesUseCase(fakeEarthquakeRepo, fakeLocationRepo),
         refreshEarthquakes = RefreshEarthquakesUseCase(fakeEarthquakeRepo),
         earthquakeRepository = fakeEarthquakeRepo,
         locationRepository = fakeLocationRepo,
         filterStateHolder = FilterStateHolder(),
+        syncMetadataStore = syncMetadataStore,
         clock = clock,
     )
 
