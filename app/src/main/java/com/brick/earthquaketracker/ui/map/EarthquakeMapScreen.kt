@@ -43,6 +43,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -271,7 +273,8 @@ private fun ClusterBubble(cluster: Cluster<EarthquakeClusterItem>) {
         modifier = Modifier
             .size(48.dp)
             .border(width = 3.dp, color = Color.White, shape = CircleShape)
-            .background(color, CircleShape),
+            .background(color, CircleShape)
+            .semantics { contentDescription = "$count earthquakes in this area" },
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -292,8 +295,14 @@ private fun MarkerBubble(item: EarthquakeClusterItem) {
     val magnitude = item.listing.earthquake.magnitude
     val color = magnitudeColor(magnitude)
     val display = magnitude?.let { "%.1f".format(it) } ?: "?"
+    val place = item.listing.earthquake.place
+    val a11yLabel = magnitude?.let { "Magnitude $display earthquake, $place" }
+        ?: "Earthquake, $place"
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.semantics { contentDescription = a11yLabel },
+    ) {
         Box(
             modifier = Modifier
                 .size(36.dp)

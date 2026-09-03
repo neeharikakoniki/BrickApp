@@ -56,6 +56,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.brick.earthquaketracker.domain.model.EarthquakeFilter
@@ -94,6 +96,14 @@ fun EarthquakeListScreen(
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val haptic = LocalHapticFeedback.current
+    var wasRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(state.isRefreshing) {
+        if (wasRefreshing && !state.isRefreshing) {
+            haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+        }
+        wasRefreshing = state.isRefreshing
+    }
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let {
@@ -166,11 +176,13 @@ fun EarthquakeListScreen(
                                 items = state.earthquakes,
                                 key = { it.earthquake.id },
                             ) { listing ->
-                                EarthquakeRow(
-                                    listing = listing,
-                                    onClick = { onQuakeClick(listing.earthquake.id) },
-                                )
-                                HorizontalDivider()
+                                Column(modifier = Modifier.animateItem()) {
+                                    EarthquakeRow(
+                                        listing = listing,
+                                        onClick = { onQuakeClick(listing.earthquake.id) },
+                                    )
+                                    HorizontalDivider()
+                                }
                             }
                         }
                     }

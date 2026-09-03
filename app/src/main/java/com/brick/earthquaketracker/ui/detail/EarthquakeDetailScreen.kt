@@ -160,7 +160,7 @@ private fun DetailContent(
                 ) {
                     Icon(
                         Icons.Outlined.Warning,
-                        contentDescription = null,
+                        contentDescription = "Warning",
                         tint = MaterialTheme.colorScheme.error,
                     )
                     Text(
@@ -188,7 +188,7 @@ private fun DetailContent(
                 ) {
                     Icon(
                         Icons.Outlined.Warning,
-                        contentDescription = null,
+                        contentDescription = "Alert",
                         tint = alertColor(alert),
                     )
                     Text(
