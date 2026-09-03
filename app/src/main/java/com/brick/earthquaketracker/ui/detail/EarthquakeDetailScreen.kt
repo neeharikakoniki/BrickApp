@@ -124,7 +124,11 @@ private fun DetailContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            MagnitudeBadge(quake.magnitude, Modifier.size(64.dp))
+            MagnitudeBadge(
+                magnitude = quake.magnitude,
+                modifier = Modifier.size(64.dp),
+                sharedElementKey = "magnitude_badge_${quake.id}",
+            )
             Column {
                 Text(
                     text = quake.place,

@@ -18,8 +18,9 @@ data class ListUiState(
     val locationPromptDismissed: Boolean = false,
     val filter: EarthquakeFilter = EarthquakeFilter.Default,
     val sortOrder: SortOrder = SortOrder.MOST_RECENT,
+    val searchQuery: String = "",
 ) {
-    val isFiltered: Boolean get() = filter != EarthquakeFilter.Default
+    val isFiltered: Boolean get() = filter != EarthquakeFilter.Default || searchQuery.isNotBlank()
 }
 
 enum class EmptyReason {

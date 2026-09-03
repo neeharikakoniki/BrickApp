@@ -6,6 +6,8 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -17,6 +19,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -50,6 +53,7 @@ private val bottomNavItems = listOf(
     BottomNavItem("Map", Icons.Default.Map, Route.Map()),
 )
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun QuakesNavHost(
     navController: NavHostController,
@@ -114,74 +118,92 @@ fun QuakesNavHost(
             }
         },
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Route.List,
-            modifier = Modifier
-                .padding(innerPadding)
-                .consumeWindowInsets(innerPadding),
-        ) {
-            composable<Route.List> {
-                val state by listViewModel.uiState.collectAsStateWithLifecycle()
-                EarthquakeListScreen(
-                    state = state,
-                    onQuakeClick = { eventId -> navController.navigate(Route.Detail(eventId)) },
-                    onRefresh = listViewModel::refresh,
-                    onFilterChange = listViewModel::updateFilter,
-                    onSortChange = listViewModel::updateSortOrder,
-                    onClearError = listViewModel::clearError,
-                    onRequestLocationPermission = {
-                        permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                    },
-                    onDismissLocationPrompt = listViewModel::dismissLocationPrompt,
-                    onOpenAppSettings = {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = "package:${context.packageName}".toUri()
-                        }
-                        context.startActivity(intent)
-                    },
-                )
-            }
+        SharedTransitionLayout {
+            NavHost(
+                navController = navController,
+                startDestination = Route.List,
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .consumeWindowInsets(innerPadding),
+            ) {
+                composable<Route.List> {
+                    CompositionLocalProvider(
+                        LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                        LocalAnimatedVisibilityScope provides this@composable,
+                    ) {
+                        val state by listViewModel.uiState.collectAsStateWithLifecycle()
+                        EarthquakeListScreen(
+                            state = state,
+                            onQuakeClick = { eventId -> navController.navigate(Route.Detail(eventId)) },
+                            onRefresh = listViewModel::refresh,
+                            onFilterChange = listViewModel::updateFilter,
+                            onSortChange = listViewModel::updateSortOrder,
+                            onSearchQueryChange = listViewModel::updateSearchQuery,
+                            onClearError = listViewModel::clearError,
+                            onRequestLocationPermission = {
+                                permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                            },
+                            onDismissLocationPrompt = listViewModel::dismissLocationPrompt,
+                            onOpenAppSettings = {
+                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = "package:${context.packageName}".toUri()
+                                }
+                                context.startActivity(intent)
+                            },
+                        )
+                    }
+                }
 
-            composable<Route.Map> { backStackEntry ->
-                val route = backStackEntry.toRoute<Route.Map>()
-                val viewModel = hiltViewModel<EarthquakeMapViewModel>()
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
-                EarthquakeMapScreen(
-                    state = state,
-                    onMarkerClick = { eventId -> navController.navigate(Route.Detail(eventId)) },
-                    onRefresh = viewModel::refresh,
-                    onFilterChange = viewModel::updateFilter,
-                    focusEventId = route.focusEventId,
-                    bottomBarHeight = 0,
-                )
-            }
+                composable<Route.Map> { backStackEntry ->
+                    CompositionLocalProvider(
+                        LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                        LocalAnimatedVisibilityScope provides this@composable,
+                    ) {
+                        val route = backStackEntry.toRoute<Route.Map>()
+                        val viewModel = hiltViewModel<EarthquakeMapViewModel>()
+                        val state by viewModel.uiState.collectAsStateWithLifecycle()
+                        EarthquakeMapScreen(
+                            state = state,
+                            onMarkerClick = { eventId -> navController.navigate(Route.Detail(eventId)) },
+                            onRefresh = viewModel::refresh,
+                            onFilterChange = viewModel::updateFilter,
+                            focusEventId = route.focusEventId,
+                            bottomBarHeight = 0,
+                        )
+                    }
+                }
 
-            composable<Route.Detail> {
-                val viewModel = hiltViewModel<EarthquakeDetailViewModel>()
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
-                EarthquakeDetailScreen(
-                    state = state,
-                    onBack = { navController.popBackStack() },
-                    onViewOnMap = { eventId ->
-                        navController.navigate(Route.Map(focusEventId = eventId)) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                        }
-                    },
-                    onOpenUsgs = { url ->
-                        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
-                    },
-                    onShare = { text ->
-                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                            putExtra(Intent.EXTRA_TEXT, text)
-                            type = "text/plain"
-                        }
-                        context.startActivity(Intent.createChooser(sendIntent, null))
-                    },
-                )
+                composable<Route.Detail> {
+                    CompositionLocalProvider(
+                        LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                        LocalAnimatedVisibilityScope provides this@composable,
+                    ) {
+                        val viewModel = hiltViewModel<EarthquakeDetailViewModel>()
+                        val state by viewModel.uiState.collectAsStateWithLifecycle()
+                        EarthquakeDetailScreen(
+                            state = state,
+                            onBack = { navController.popBackStack() },
+                            onViewOnMap = { eventId ->
+                                navController.navigate(Route.Map(focusEventId = eventId)) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                }
+                            },
+                            onOpenUsgs = { url ->
+                                context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                            },
+                            onShare = { text ->
+                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                    putExtra(Intent.EXTRA_TEXT, text)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, null))
+                            },
+                        )
+                    }
+                }
             }
         }
     }

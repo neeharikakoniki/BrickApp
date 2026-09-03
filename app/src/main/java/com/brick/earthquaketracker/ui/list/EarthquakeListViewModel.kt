@@ -41,6 +41,7 @@ class EarthquakeListViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _errorMessage = MutableStateFlow<String?>(null)
+    private val _searchQuery = MutableStateFlow("")
 
     private val _requestLocationPermission = MutableSharedFlow<Unit>()
     val requestLocationPermission: SharedFlow<Unit> = _requestLocationPermission.asSharedFlow()
@@ -58,14 +59,21 @@ class EarthquakeListViewModel @Inject constructor(
             syncMetadataStore.locationPromptDismissed,
         ) { loc, count, dismissed -> Triple(loc, count, dismissed) },
         filterSort,
-        _errorMessage,
-    ) { earthquakes, syncStatus, (locationState, totalCount, promptDismissed), (filter, sortOrder), errorMsg ->
+        combine(_errorMessage, _searchQuery) { err, q -> err to q },
+    ) { earthquakes, syncStatus, (locationState, totalCount, promptDismissed), (filter, sortOrder), (errorMsg, query) ->
+        val filtered = if (query.isBlank()) {
+            earthquakes
+        } else {
+            earthquakes.filter { it.earthquake.place.contains(query, ignoreCase = true) }
+        }
+
         val isInitialLoading = syncStatus.lastSyncAt == null && syncStatus.inFlight
+        val isSearchActive = query.isNotBlank()
         val emptyReason = when {
-            earthquakes.isNotEmpty() -> null
+            filtered.isNotEmpty() -> null
             isInitialLoading -> null
             syncStatus.lastSyncAt == null -> EmptyReason.NO_CACHE_OFFLINE
-            filter != EarthquakeFilter.Default -> EmptyReason.NO_RESULTS_FOR_FILTER
+            isSearchActive || filter != EarthquakeFilter.Default -> EmptyReason.NO_RESULTS_FOR_FILTER
             else -> EmptyReason.NO_DATA
         }
         val staleSince = syncStatus.lastSyncAt?.takeIf {
@@ -73,7 +81,7 @@ class EarthquakeListViewModel @Inject constructor(
         }
 
         ListUiState(
-            earthquakes = earthquakes,
+            earthquakes = filtered,
             totalCount = totalCount,
             isInitialLoading = isInitialLoading,
             isRefreshing = syncStatus.inFlight && !isInitialLoading,
@@ -84,6 +92,7 @@ class EarthquakeListViewModel @Inject constructor(
             locationPromptDismissed = promptDismissed,
             filter = filter,
             sortOrder = sortOrder,
+            searchQuery = query,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -107,6 +116,10 @@ class EarthquakeListViewModel @Inject constructor(
 
     fun clearError() {
         _errorMessage.value = null
+    }
+
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
     }
 
     fun updateFilter(filter: EarthquakeFilter) {

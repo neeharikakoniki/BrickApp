@@ -1,6 +1,10 @@
 package com.brick.earthquaketracker.ui.list
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -20,16 +24,22 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.LocationOff
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -45,6 +55,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -56,6 +68,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
@@ -81,7 +96,7 @@ private val MAGNITUDE_THRESHOLDS = listOf(
     6.0 to "M6+",
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun EarthquakeListScreen(
     state: ListUiState,
@@ -89,6 +104,7 @@ fun EarthquakeListScreen(
     onRefresh: () -> Unit,
     onFilterChange: (EarthquakeFilter) -> Unit,
     onSortChange: (SortOrder) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
     onClearError: () -> Unit,
     onRequestLocationPermission: () -> Unit,
     onDismissLocationPrompt: () -> Unit,
@@ -118,8 +134,10 @@ fun EarthquakeListScreen(
             ListTopBar(
                 sortOrder = state.sortOrder,
                 filter = state.filter,
+                searchQuery = state.searchQuery,
                 onSortChange = onSortChange,
                 onFilterChange = onFilterChange,
+                onSearchQueryChange = onSearchQueryChange,
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -145,6 +163,10 @@ fun EarthquakeListScreen(
                     )
                 }
                 else -> {
+                    val grouped = remember(state.earthquakes) {
+                        groupByTimePeriod(state.earthquakes)
+                    }
+
                     PullToRefreshBox(
                         isRefreshing = state.isRefreshing,
                         onRefresh = onRefresh,
@@ -152,7 +174,12 @@ fun EarthquakeListScreen(
                     ) {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 8.dp),
+                            contentPadding = PaddingValues(
+                                start = 12.dp,
+                                end = 12.dp,
+                                bottom = 12.dp,
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             item(key = "location_banner") {
                                 LocationBanner(
@@ -164,24 +191,27 @@ fun EarthquakeListScreen(
                                 )
                             }
 
-                            item(key = "summary_header") {
-                                SummaryHeader(
-                                    count = state.earthquakes.size,
+                            item(key = "stats_banner") {
+                                QuickStatsBanner(
+                                    earthquakes = state.earthquakes,
                                     totalCount = state.totalCount,
                                     isFiltered = state.isFiltered,
                                 )
                             }
 
-                            items(
-                                items = state.earthquakes,
-                                key = { it.earthquake.id },
-                            ) { listing ->
-                                Column(modifier = Modifier.animateItem()) {
-                                    EarthquakeRow(
+                            grouped.forEach { (period, listings) ->
+                                stickyHeader(key = "header_${period.name}") {
+                                    TimeGroupHeader(period)
+                                }
+                                items(
+                                    items = listings,
+                                    key = { it.earthquake.id },
+                                ) { listing ->
+                                    EarthquakeCard(
                                         listing = listing,
                                         onClick = { onQuakeClick(listing.earthquake.id) },
+                                        modifier = Modifier.animateItem(),
                                     )
-                                    HorizontalDivider()
                                 }
                             }
                         }
@@ -193,28 +223,98 @@ fun EarthquakeListScreen(
 }
 
 // ---------------------------------------------------------------------------
-// Summary header
+// Quick-stats banner
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun SummaryHeader(
-    count: Int,
+private fun QuickStatsBanner(
+    earthquakes: List<EarthquakeListing>,
     totalCount: Int,
     isFiltered: Boolean,
 ) {
     val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.getDefault()) }
-    val label = if (isFiltered) {
-        "${numberFormat.format(count)} of ${numberFormat.format(totalCount)} events"
+
+    val countLabel = if (isFiltered) {
+        "${numberFormat.format(earthquakes.size)} of ${numberFormat.format(totalCount)}"
     } else {
-        "${numberFormat.format(count)} events"
+        numberFormat.format(earthquakes.size)
     }
 
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
-    )
+    val lastDayCount = remember(earthquakes) {
+        val oneDayAgo = Instant.now().minus(Duration.ofDays(1))
+        earthquakes.count { it.earthquake.occurredAt.isAfter(oneDayAgo) }
+    }
+
+    val largest = remember(earthquakes) {
+        earthquakes.maxByOrNull { it.earthquake.magnitude ?: 0.0 }
+    }
+
+    val nearest = remember(earthquakes) {
+        earthquakes.filter { it.distanceKm != null }.minByOrNull { it.distanceKm!! }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        StatPill(
+            label = "Events",
+            value = countLabel,
+            modifier = Modifier.weight(1f),
+        )
+        StatPill(
+            label = "24h",
+            value = numberFormat.format(lastDayCount),
+            modifier = Modifier.weight(1f),
+        )
+        largest?.earthquake?.magnitude?.let { mag ->
+            StatPill(
+                label = "Largest",
+                value = "M${"%.1f".format(mag)}",
+                modifier = Modifier.weight(1f),
+            )
+        }
+        nearest?.distanceKm?.let { km ->
+            StatPill(
+                label = "Nearest",
+                value = "${numberFormat.format(km.toLong())} km",
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatPill(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -358,56 +458,70 @@ private fun LocationPromptRow(
 }
 
 // ---------------------------------------------------------------------------
-// Earthquake row
+// Earthquake card
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun EarthquakeRow(listing: EarthquakeListing, onClick: () -> Unit) {
+private fun EarthquakeCard(
+    listing: EarthquakeListing,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val quake = listing.earthquake
     val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.getDefault()) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+    Card(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            MagnitudeBadge(quake.magnitude)
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = quake.place,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val isRecent = Duration.between(quake.occurredAt, Instant.now()).toHours() < 1
+                MagnitudeBadge(
+                    magnitude = quake.magnitude,
+                    isRecent = isRecent,
+                    sharedElementKey = "magnitude_badge_${quake.id}",
                 )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = buildSupportingText(quake.occurredAt, quake.depthKm),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = quake.place,
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = buildSupportingText(quake.occurredAt, quake.depthKm),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (quake.tsunamiWarning) {
+                    Spacer(Modifier.width(8.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Warning,
+                        contentDescription = "Tsunami warning",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
-            if (quake.tsunamiWarning) {
-                Spacer(Modifier.width(8.dp))
-                Icon(
-                    imageVector = Icons.Outlined.Warning,
-                    contentDescription = "Tsunami warning",
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
 
-        listing.distanceKm?.let { km ->
-            val bearingLabel = listing.bearing?.label?.let { " $it" } ?: ""
-            Text(
-                text = "${numberFormat.format(km.toLong())} km$bearingLabel",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 52.dp, top = 4.dp),
-            )
+            listing.distanceKm?.let { km ->
+                val bearingLabel = listing.bearing?.label?.let { " $it" } ?: ""
+                Text(
+                    text = "${numberFormat.format(km.toLong())} km$bearingLabel",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 52.dp, top = 4.dp),
+                )
+            }
         }
     }
 }
@@ -419,6 +533,54 @@ private fun buildSupportingText(occurredAt: Instant, depthKm: Double): String {
         else -> "${depthKm.toLong()} km deep"
     }
     return "$relativeTime · $depthText"
+}
+
+// ---------------------------------------------------------------------------
+// Time-grouped sections
+// ---------------------------------------------------------------------------
+
+private enum class TimePeriod(val label: String) {
+    LAST_HOUR("Last hour"),
+    TODAY("Today"),
+    YESTERDAY("Yesterday"),
+    THIS_WEEK("This week"),
+    OLDER("Older"),
+}
+
+private fun classifyTimePeriod(occurredAt: Instant): TimePeriod {
+    val now = Instant.now()
+    val duration = Duration.between(occurredAt, now)
+    return when {
+        duration.toHours() < 1 -> TimePeriod.LAST_HOUR
+        duration.toHours() < 24 -> TimePeriod.TODAY
+        duration.toHours() < 48 -> TimePeriod.YESTERDAY
+        duration.toDays() < 7 -> TimePeriod.THIS_WEEK
+        else -> TimePeriod.OLDER
+    }
+}
+
+private fun groupByTimePeriod(
+    listings: List<EarthquakeListing>,
+): List<Pair<TimePeriod, List<EarthquakeListing>>> {
+    val grouped = listings.groupBy { classifyTimePeriod(it.earthquake.occurredAt) }
+    return TimePeriod.entries.mapNotNull { period ->
+        grouped[period]?.let { period to it }
+    }
+}
+
+@Composable
+private fun TimeGroupHeader(period: TimePeriod) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Text(
+            text = period.label,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 6.dp),
+        )
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -436,45 +598,52 @@ private fun ShimmerList() {
     )
     val shimmerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
 
-    Column(modifier = Modifier.padding(top = 8.dp)) {
+    Column(
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         repeat(8) {
-            ShimmerRow(shimmerColor)
-            if (it < 7) HorizontalDivider()
+            ShimmerCard(shimmerColor)
         }
     }
 }
 
 @Composable
-private fun ShimmerRow(color: androidx.compose.ui.graphics.Color) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+private fun ShimmerCard(color: androidx.compose.ui.graphics.Color) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 1.dp,
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(color),
-        )
-        Spacer(Modifier.width(12.dp))
-        Column {
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.7f)
-                    .height(14.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .size(40.dp)
+                    .clip(CircleShape)
                     .background(color),
             )
-            Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.45f)
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(color),
-            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(color),
+                )
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.45f)
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(color),
+                )
+            }
         }
     }
 }
@@ -488,41 +657,97 @@ private fun ShimmerRow(color: androidx.compose.ui.graphics.Color) {
 private fun ListTopBar(
     sortOrder: SortOrder,
     filter: EarthquakeFilter,
+    searchQuery: String,
     onSortChange: (SortOrder) -> Unit,
     onFilterChange: (EarthquakeFilter) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
 ) {
     var showSortMenu by remember { mutableStateOf(false) }
+    var searchExpanded by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(searchExpanded) {
+        if (searchExpanded) focusRequester.requestFocus()
+    }
 
     Column {
         TopAppBar(
-            title = { Text("Quakes") },
-            actions = {
-                IconButton(onClick = { showSortMenu = true }) {
-                    Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
-                }
-                DropdownMenu(
-                    expanded = showSortMenu,
-                    onDismissRequest = { showSortMenu = false },
+            title = {
+                AnimatedVisibility(
+                    visible = searchExpanded,
+                    enter = fadeIn() + expandHorizontally(expandFrom = Alignment.Start),
+                    exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.Start),
                 ) {
-                    SortOrder.entries.forEach { order ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = order.displayName(),
-                                    color = if (order == sortOrder) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurface,
-                                )
-                            },
-                            onClick = {
-                                onSortChange(order)
-                                showSortMenu = false
-                            },
-                        )
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        placeholder = { Text("Search by location…") },
+                        singleLine = true,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
+                    )
+                }
+                if (!searchExpanded) {
+                    Text("Earthquake Tracker")
+                }
+            },
+            navigationIcon = {
+                if (searchExpanded) {
+                    IconButton(onClick = {
+                        searchExpanded = false
+                        onSearchQueryChange("")
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close search")
+                    }
+                }
+            },
+            actions = {
+                if (!searchExpanded) {
+                    IconButton(onClick = { searchExpanded = true }) {
+                        Icon(Icons.Default.Search, contentDescription = "Search")
+                    }
+                } else if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { onSearchQueryChange("") }) {
+                        Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                    }
+                }
+                if (!searchExpanded) {
+                    IconButton(onClick = { showSortMenu = true }) {
+                        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
+                    }
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false },
+                    ) {
+                        SortOrder.entries.forEach { order ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = order.displayName(),
+                                        color = if (order == sortOrder) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurface,
+                                    )
+                                },
+                                onClick = {
+                                    onSortChange(order)
+                                    showSortMenu = false
+                                },
+                            )
+                        }
                     }
                 }
             },
         )
-        MagnitudeFilterChips(filter = filter, onFilterChange = onFilterChange)
+        if (!searchExpanded) {
+            MagnitudeFilterChips(filter = filter, onFilterChange = onFilterChange)
+        }
     }
 }
 

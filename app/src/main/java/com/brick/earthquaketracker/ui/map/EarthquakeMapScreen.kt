@@ -225,7 +225,7 @@ private fun MapTopBar(
     Surface(tonalElevation = 2.dp) {
         Column {
             TopAppBar(
-                title = { Text("Quakes") },
+                title = { Text("Seismic Map") },
                 actions = {
                     if (isRefreshing) {
                         CircularProgressIndicator(
