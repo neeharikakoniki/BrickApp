@@ -204,11 +204,106 @@ class EarthquakeListViewModelTest {
         assertThat(fakeLocationRepo.lastPermissionResult).isTrue()
     }
 
-    private fun testQuake(id: String, magnitude: Double? = 4.5) = Earthquake(
+
+    @Test
+    fun `search filters earthquakes by place name`() = runTest {
+        syncStatusFlow.value = SyncStatus(lastSyncAt = Instant.now(), inFlight = false)
+        earthquakesFlow.value = listOf(
+            testQuake("q1", place = "10km NW of Tokyo, Japan"),
+            testQuake("q2", place = "5km SE of Los Angeles, CA"),
+            testQuake("q3", place = "20km E of Osaka, Japan"),
+        )
+
+        val vm = createViewModel()
+
+        vm.uiState.test {
+            assertThat(awaitItem().earthquakes).hasSize(3)
+
+            vm.updateSearchQuery("Japan")
+            val filtered = awaitItem()
+            assertThat(filtered.earthquakes).hasSize(2)
+            assertThat(filtered.earthquakes.map { it.earthquake.id }).containsExactly("q1", "q3")
+            assertThat(filtered.searchQuery).isEqualTo("Japan")
+        }
+    }
+
+    @Test
+    fun `search is case insensitive`() = runTest {
+        syncStatusFlow.value = SyncStatus(lastSyncAt = Instant.now(), inFlight = false)
+        earthquakesFlow.value = listOf(
+            testQuake("q1", place = "10km NW of TOKYO, Japan"),
+            testQuake("q2", place = "5km SE of Los Angeles, CA"),
+        )
+
+        val vm = createViewModel()
+
+        vm.uiState.test {
+            skipItems(1)
+            vm.updateSearchQuery("tokyo")
+            assertThat(awaitItem().earthquakes).hasSize(1)
+        }
+    }
+
+    @Test
+    fun `search with no matches shows NO_RESULTS_FOR_FILTER`() = runTest {
+        syncStatusFlow.value = SyncStatus(lastSyncAt = Instant.now(), inFlight = false)
+        earthquakesFlow.value = listOf(testQuake("q1", place = "Tokyo, Japan"))
+
+        val vm = createViewModel()
+
+        vm.uiState.test {
+            skipItems(1)
+            vm.updateSearchQuery("zzz_no_match")
+            val state = awaitItem()
+            assertThat(state.earthquakes).isEmpty()
+            assertThat(state.emptyReason).isEqualTo(EmptyReason.NO_RESULTS_FOR_FILTER)
+        }
+    }
+
+    @Test
+    fun `clearing search query restores full list`() = runTest {
+        syncStatusFlow.value = SyncStatus(lastSyncAt = Instant.now(), inFlight = false)
+        earthquakesFlow.value = listOf(
+            testQuake("q1", place = "Tokyo, Japan"),
+            testQuake("q2", place = "Los Angeles, CA"),
+        )
+
+        val vm = createViewModel()
+
+        vm.uiState.test {
+            assertThat(awaitItem().earthquakes).hasSize(2)
+
+            vm.updateSearchQuery("Tokyo")
+            assertThat(awaitItem().earthquakes).hasSize(1)
+
+            vm.updateSearchQuery("")
+            assertThat(awaitItem().earthquakes).hasSize(2)
+        }
+    }
+
+    @Test
+    fun `search query is reflected in isFiltered`() = runTest {
+        syncStatusFlow.value = SyncStatus(lastSyncAt = Instant.now(), inFlight = false)
+        earthquakesFlow.value = listOf(testQuake("q1"))
+
+        val vm = createViewModel()
+
+        vm.uiState.test {
+            assertThat(awaitItem().isFiltered).isFalse()
+
+            vm.updateSearchQuery("test")
+            assertThat(awaitItem().isFiltered).isTrue()
+
+            vm.updateSearchQuery("")
+            assertThat(awaitItem().isFiltered).isFalse()
+        }
+    }
+
+    private fun testQuake(id: String, magnitude: Double? = 4.5, place: String = "Test Place") = Earthquake(
         id = id,
         magnitude = magnitude,
         magnitudeType = "ml",
-        place = "Test Place",
+        place = place,
         occurredAt = Instant.parse("2024-01-14T12:00:00Z"),
         updatedAt = Instant.parse("2024-01-14T12:05:00Z"),
         coordinates = Coordinates(latitude = 37.0, longitude = -120.0),
